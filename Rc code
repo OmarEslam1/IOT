@@ -1,0 +1,129 @@
+// Define motor control pins for L298N
+const int IN1 = 8;
+const int IN2 = 9;
+const int IN3 = 10;
+const int IN4 = 11;
+const int ENA = 5;
+const int ENB = 6;
+
+// Define sensor pins
+const int lineSensor = A0;
+const int irSensor = 7;
+
+// Define thresholds for line detection
+const int edgeThreshold = 500;
+
+void setup() {
+  Serial.begin(9600);
+
+  // Motor control pins
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  pinMode(ENA, OUTPUT);
+  pinMode(ENB, OUTPUT);
+
+  // Sensor pins
+  pinMode(lineSensor, INPUT);
+  pinMode(irSensor, INPUT);
+}
+
+void loop() {
+  int lineValue = analogRead(lineSensor);
+  int irValue = digitalRead(irSensor);
+
+  if (lineValue > edgeThreshold) {
+    // Line sensor detects the edge, avoid falling off
+    avoidEdge();
+  } else if (irValue == LOW) {
+    // IR sensor detects an opponent, chase it
+    chaseOpponent();
+  } else {
+    // No edge detected, perform scanning behavior
+    scanForOpponent();
+  }
+}
+
+void moveForward() {
+  analogWrite(ENA, 255);  // Set speed
+  analogWrite(ENB, 255);  // Set speed
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+}
+
+void avoidEdge() {
+  // Basic edge avoidance: stop and turn
+  stopMotors();
+  delay(500);
+  turnAround();
+}
+
+void turnAround() {
+  analogWrite(ENA, 255);  // Set speed
+  analogWrite(ENB, 255);  // Set speed
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  delay(500);  // Turn for a short duration
+  moveForward();
+}
+
+void stopMotors() {
+  analogWrite(ENA, 0);  // Stop motors
+  analogWrite(ENB, 0);  // Stop motors
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+}
+
+void scanForOpponent() {
+  // Rotate in place to scan for the opponent
+  analogWrite(ENA, 200);  // Adjust speed as necessary
+  analogWrite(ENB, 200);  // Adjust speed as necessary
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+
+  unsigned long startTime = millis();
+  unsigned long scanDuration = 3000;  // Scan for 3 seconds
+
+  while (millis() - startTime < scanDuration) {
+    int irValue = digitalRead(irSensor);
+    if (irValue == LOW) {
+      // Opponent detected, move towards it
+      moveForward();
+      return;
+    }
+  }
+
+  // Stop scanning after the duration
+  stopMotors();
+}
+
+void chaseOpponent() {
+  while (true) {
+    int lineValue = analogRead(lineSensor);
+    int irValue = digitalRead(irSensor);
+
+    if (lineValue > edgeThreshold) {
+      // Edge detected, avoid falling off
+      avoidEdge();
+      break;
+    }
+
+    if (irValue == HIGH) {
+      // Lost sight of the opponent, stop chasing
+      stopMotors();
+      break;
+    }
+
+    // Continue moving forward towards the opponent
+    moveForward();
+  }
+}
